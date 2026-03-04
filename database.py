@@ -3,17 +3,24 @@ from psycopg2 import pool
 import os
 from dotenv import load_dotenv
 
-# Load environment variables
+# Load local .env if running on your computer
 load_dotenv(override=True)
 
+# Safely read environment variable
+DB_PASSWORD = os.getenv("DB_PASSWORD")
 
-# Create a connection pool
+if not DB_PASSWORD:
+    raise Exception("DB_PASSWORD environment variable not found")
+
+
+# Create connection pool
 connection_pool = psycopg2.pool.SimpleConnectionPool(
-    1, 10,
+    1,
+    10,
     host="aws-1-ap-southeast-2.pooler.supabase.com",
     database="postgres",
     user="postgres.isurklczfsdjdfeyrvxx",
-    password = os.environ["DB_PASSWORD"],
+    password=DB_PASSWORD,
     port=6543,
     sslmode="require"
 )
@@ -34,17 +41,15 @@ def insert_document(title, url, content):
 
     try:
 
-        cur.execute("""
+        cur.execute(
+            """
             INSERT INTO documents (title, url, content, search_vector)
-            VALUES (
-                %s,
-                %s,
-                %s,
-                to_tsvector('english', %s)
-            )
+            VALUES (%s, %s, %s, to_tsvector('english', %s))
             ON CONFLICT (url) DO NOTHING
             RETURNING id;
-        """, (title, url, content, content))
+            """,
+            (title, url, content, content)
+        )
 
         result = cur.fetchone()
 
@@ -74,11 +79,14 @@ def get_documents_by_ids(doc_ids):
 
     try:
 
-        cur.execute("""
+        cur.execute(
+            """
             SELECT id, title, url, content
             FROM documents
             WHERE id = ANY(%s);
-        """, (doc_ids,))
+            """,
+            (doc_ids,)
+        )
 
         rows = cur.fetchall()
 
@@ -92,5 +100,4 @@ def get_documents_by_ids(doc_ids):
     finally:
 
         cur.close()
-
         release_connection(conn)
