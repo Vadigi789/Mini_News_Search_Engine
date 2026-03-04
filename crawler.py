@@ -255,7 +255,7 @@ START_URLS = [
 async def main():
 
     crawler = WebCrawler(
-        max_pages=200,
+        max_pages=100,
         workers=25
     )
 
@@ -274,4 +274,5 @@ if __name__ == "__main__":
     asyncio.run(main())
 
     print("\nCrawling finished.")
+
 
