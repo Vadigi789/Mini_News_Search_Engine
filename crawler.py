@@ -19,7 +19,7 @@ class WebCrawler:
         self.max_pages = max_pages
         self.workers = workers
 
-        # NEW: control concurrent requests
+        # limit concurrent requests
         self.sem = asyncio.Semaphore(10)
 
 
@@ -40,12 +40,18 @@ class WebCrawler:
 
         try:
 
-            async with self.sem:  # prevent too many parallel requests
+            async with self.sem:
 
-                async with session.get(url) as response:
+                timeout = aiohttp.ClientTimeout(
+                    total=8,
+                    connect=5,
+                    sock_read=5
+                )
+
+                async with session.get(url, timeout=timeout) as response:
 
                     if response.status in [403, 429]:
-                        print("Blocked by site:", url)
+                        print("Blocked:", url)
                         return None
 
                     if response.status != 200:
@@ -53,10 +59,12 @@ class WebCrawler:
 
                     return await response.text()
 
+        except asyncio.TimeoutError:
+            print("Timeout:", url)
+            return None
+
         except Exception as e:
-
             print("Fetch error:", url, e)
-
             return None
 
 
@@ -76,7 +84,12 @@ class WebCrawler:
 
                 print("\nCrawling:", url)
 
-                html = await self.fetch(session, url)
+                # retry fetch once
+                html = None
+                for _ in range(2):
+                    html = await self.fetch(session, url)
+                    if html:
+                        break
 
                 if not html:
                     self.visited.add(url)
@@ -103,7 +116,13 @@ class WebCrawler:
                     title = soup.title.string.strip()
 
 
-                doc_id = insert_document(title, url, content)
+                # run DB insert in background thread
+                doc_id = await asyncio.to_thread(
+                    insert_document,
+                    title,
+                    url,
+                    content
+                )
 
                 print("Inserted:", doc_id)
 
@@ -114,7 +133,6 @@ class WebCrawler:
                 for link in soup.find_all("a", href=True):
 
                     href = link["href"]
-
                     full_url = urljoin(url, href)
 
                     parsed = urlparse(full_url)
@@ -127,7 +145,7 @@ class WebCrawler:
                         and self.is_valid_url(full_url)
                     ):
 
-                        if self.to_visit.qsize() < 2000:
+                        if self.to_visit.qsize() < 1000:
 
                             self.queued.add(full_url)
 
@@ -157,11 +175,8 @@ class WebCrawler:
 
         domains = {urlparse(url).netloc for url in start_urls}
 
-        timeout = aiohttp.ClientTimeout(total=10)
-
         async with aiohttp.ClientSession(
-            headers={"User-Agent": "Mozilla/5.0"},
-            timeout=timeout
+            headers={"User-Agent": "Mozilla/5.0"}
         ) as session:
 
             tasks = []
