@@ -12,11 +12,15 @@ class WebCrawler:
     def __init__(self, max_pages=200, workers=10):
 
         self.visited = set()
-        self.queued = set()        # NEW: track queued URLs
+        self.queued = set()
+
         self.to_visit = asyncio.Queue()
 
         self.max_pages = max_pages
         self.workers = workers
+
+        # NEW: control concurrent requests
+        self.sem = asyncio.Semaphore(10)
 
 
     def is_valid_url(self, url):
@@ -35,15 +39,24 @@ class WebCrawler:
     async def fetch(self, session, url):
 
         try:
-            async with session.get(url) as response:
 
-                if response.status != 200:
-                    return None
+            async with self.sem:  # prevent too many parallel requests
 
-                return await response.text()
+                async with session.get(url) as response:
 
-        except:
-            print("Fetch error:", url)
+                    if response.status in [403, 429]:
+                        print("Blocked by site:", url)
+                        return None
+
+                    if response.status != 200:
+                        return None
+
+                    return await response.text()
+
+        except Exception as e:
+
+            print("Fetch error:", url, e)
+
             return None
 
 
@@ -52,89 +65,95 @@ class WebCrawler:
         while True:
 
             if len(self.visited) >= self.max_pages:
-                return
+                break
+
+            url = await self.to_visit.get()
 
             try:
-                url = await asyncio.wait_for(self.to_visit.get(), timeout=5)
-            except asyncio.TimeoutError:
-                return
 
-            if url in self.visited:
-                self.to_visit.task_done()
-                continue
+                if url in self.visited:
+                    continue
 
-            print("\nCrawling:", url)
+                print("\nCrawling:", url)
 
-            html = await self.fetch(session, url)
+                html = await self.fetch(session, url)
 
-            if not html:
+                if not html:
+                    self.visited.add(url)
+                    continue
+
+
+                soup = BeautifulSoup(html, "html.parser")
+
+                paragraphs = soup.find_all("p")
+
+                if len(paragraphs) < 3:
+                    self.visited.add(url)
+                    continue
+
+
+                full_text = "\n".join(p.get_text() for p in paragraphs)
+
+                words = clean_text(full_text)
+
+                content = " ".join(words[:500])
+
+                title = url
+                if soup.title and soup.title.string:
+                    title = soup.title.string.strip()
+
+
+                doc_id = insert_document(title, url, content)
+
+                print("Inserted:", doc_id)
+
                 self.visited.add(url)
+
+
+                # Extract links
+                for link in soup.find_all("a", href=True):
+
+                    href = link["href"]
+
+                    full_url = urljoin(url, href)
+
+                    parsed = urlparse(full_url)
+
+                    if (
+                        parsed.scheme in ["http", "https"]
+                        and parsed.netloc in domains
+                        and full_url not in self.visited
+                        and full_url not in self.queued
+                        and self.is_valid_url(full_url)
+                    ):
+
+                        if self.to_visit.qsize() < 2000:
+
+                            self.queued.add(full_url)
+
+                            await self.to_visit.put(full_url)
+
+
+                print(
+                    f"Visited: {len(self.visited)}/{self.max_pages} | Queue: {self.to_visit.qsize()}"
+                )
+
+            except Exception as e:
+
+                print("Worker error:", e)
+
+            finally:
+
                 self.to_visit.task_done()
-                continue
-
-
-            soup = BeautifulSoup(html, "html.parser")
-
-            paragraphs = soup.find_all("p")
-
-            if len(paragraphs) < 3:
-                self.visited.add(url)
-                self.to_visit.task_done()
-                continue
-
-
-            full_text = "\n".join(p.get_text() for p in paragraphs)
-
-            words = clean_text(full_text)
-
-            content = " ".join(words[:500])
-
-            title = url
-            if soup.title and soup.title.string:
-                title = soup.title.string.strip()
-
-
-            doc_id = insert_document(title, url, content)
-
-            print("Inserted:", doc_id)
-
-            self.visited.add(url)
-
-
-            # Extract links
-            for link in soup.find_all("a", href=True):
-
-                href = link["href"]
-                full_url = urljoin(url, href)
-
-                parsed = urlparse(full_url)
-
-                if (
-                    parsed.scheme in ["http", "https"]
-                    and parsed.netloc in domains
-                    and full_url not in self.visited
-                    and full_url not in self.queued      # NEW duplicate protection
-                    and self.is_valid_url(full_url)
-                ):
-
-                    if self.to_visit.qsize() < 10000:
-
-                        self.queued.add(full_url)       # track queued URLs
-                        await self.to_visit.put(full_url)
-
-
-            print(
-                f"Visited: {len(self.visited)} | Queue: {self.to_visit.qsize()}"
-            )
-
-            self.to_visit.task_done()
 
 
     async def crawl(self, start_urls):
 
         for url in start_urls:
+
             await self.to_visit.put(url)
-            self.queued.add(url)        # track starting URLs
+
+            self.queued.add(url)
 
         domains = {urlparse(url).netloc for url in start_urls}
 
@@ -148,6 +167,7 @@ class WebCrawler:
             tasks = []
 
             for _ in range(self.workers):
+
                 tasks.append(
                     asyncio.create_task(
                         self.worker(session, domains)
@@ -159,26 +179,21 @@ class WebCrawler:
             for task in tasks:
                 task.cancel()
 
-# Starting topic pages
+
 START_URLS = [
 
-    # BBC
     "https://www.bbc.com/news/world",
     "https://www.bbc.com/news/politics",
     "https://www.bbc.com/news/technology",
 
-    # CNN
     "https://edition.cnn.com/world",
     "https://edition.cnn.com/politics",
 
-    # Reuters
     "https://www.reuters.com/world/",
     "https://www.reuters.com/politics/",
 
-    # Guardian
     "https://www.theguardian.com/world",
 
-    # Indian
     "https://www.thehindu.com/news/national/",
     "https://www.ndtv.com/world-news"
 ]
@@ -197,6 +212,5 @@ async def main():
 if __name__ == "__main__":
 
     asyncio.run(main())
-
 
     print("\nCrawling finished.")
