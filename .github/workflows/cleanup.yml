@@ -1,0 +1,24 @@
+name: Weekly Database Cleanup
+
+on:
+  schedule:
+    - cron: "0 0 * * 0"   # every Sunday
+  workflow_dispatch:
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run cleanup
+        run: python cleanup_db.py
