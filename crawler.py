@@ -9,17 +9,18 @@ from utils import clean_text
 
 class WebCrawler:
 
-    def __init__(self, max_pages=200, workers=16):
+    def __init__(self, max_pages=200, workers=25):
 
         self.visited = set()
         self.queued = set()
+        self.failed_domains = set()
 
         self.to_visit = asyncio.Queue()
 
         self.max_pages = max_pages
         self.workers = workers
 
-        # limit concurrent requests
+        # concurrent request limit
         self.sem = asyncio.Semaphore(10)
 
 
@@ -43,9 +44,9 @@ class WebCrawler:
             async with self.sem:
 
                 timeout = aiohttp.ClientTimeout(
-                    total=8,
-                    connect=5,
-                    sock_read=5
+                    total=6,
+                    connect=4,
+                    sock_read=4
                 )
 
                 async with session.get(url, timeout=timeout) as response:
@@ -59,9 +60,9 @@ class WebCrawler:
 
                     html = await response.text()
 
-                    # Skip extremely large pages
+                    # skip huge pages
                     if len(html) > 1_000_000:
-                        print("Page too large, skipping:", url)
+                        print("Page too large:", url)
                         return None
 
                     return html
@@ -89,22 +90,43 @@ class WebCrawler:
                 if url in self.visited:
                     continue
 
+                domain = urlparse(url).netloc
+
+                if domain in self.failed_domains:
+                    continue
+
                 print("\nCrawling:", url)
 
-                html = None
-                for _ in range(2):
-                    html = await self.fetch(session, url)
-                    if html:
-                        break
+                # hard timeout for fetch
+                try:
+                    html = await asyncio.wait_for(
+                        self.fetch(session, url),
+                        timeout=7
+                    )
+                except asyncio.TimeoutError:
+                    print("Skipping slow site:", url)
+                    self.failed_domains.add(domain)
+                    self.visited.add(url)
+                    continue
+
 
                 if not html:
                     self.visited.add(url)
                     continue
 
 
-                soup = BeautifulSoup(html, "lxml")
+                # timeout for parsing
+                try:
+                    soup = await asyncio.wait_for(
+                        asyncio.to_thread(BeautifulSoup, html, "lxml"),
+                        timeout=3
+                    )
+                except asyncio.TimeoutError:
+                    print("Parsing too slow:", url)
+                    self.visited.add(url)
+                    continue
 
-                # Try to focus on article content
+
                 article = soup.find("article")
 
                 if article:
@@ -141,12 +163,12 @@ class WebCrawler:
                 self.visited.add(url)
 
 
-                # Extract links (limit per page)
+                # extract limited links
                 link_count = 0
 
                 for link in soup.find_all("a", href=True):
 
-                    if link_count >= 30:
+                    if link_count >= 25:
                         break
 
                     href = link["href"]
@@ -162,7 +184,7 @@ class WebCrawler:
                         and self.is_valid_url(full_url)
                     ):
 
-                        if self.to_visit.qsize() < 800:
+                        if self.to_visit.qsize() < 700:
 
                             self.queued.add(full_url)
                             await self.to_visit.put(full_url)
@@ -234,7 +256,7 @@ async def main():
 
     crawler = WebCrawler(
         max_pages=200,
-        workers=18
+        workers=25
     )
 
     await crawler.crawl(START_URLS)
