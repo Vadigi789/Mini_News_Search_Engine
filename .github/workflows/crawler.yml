@@ -9,6 +9,9 @@ jobs:
   crawl:
     runs-on: ubuntu-latest
 
+    env:
+      DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -23,5 +26,3 @@ jobs:
 
       - name: Run crawler
         run: python crawler.py
-        env:
-          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
