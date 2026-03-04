@@ -12,7 +12,9 @@ class WebCrawler:
     def __init__(self, max_pages=200, workers=10):
 
         self.visited = set()
+        self.queued = set()        # NEW: track queued URLs
         self.to_visit = asyncio.Queue()
+
         self.max_pages = max_pages
         self.workers = workers
 
@@ -99,10 +101,10 @@ class WebCrawler:
             self.visited.add(url)
 
 
+            # Extract links
             for link in soup.find_all("a", href=True):
 
                 href = link["href"]
-
                 full_url = urljoin(url, href)
 
                 parsed = urlparse(full_url)
@@ -111,10 +113,13 @@ class WebCrawler:
                     parsed.scheme in ["http", "https"]
                     and parsed.netloc in domains
                     and full_url not in self.visited
+                    and full_url not in self.queued      # NEW duplicate protection
                     and self.is_valid_url(full_url)
                 ):
 
                     if self.to_visit.qsize() < 10000:
+
+                        self.queued.add(full_url)       # track queued URLs
                         await self.to_visit.put(full_url)
 
 
@@ -129,6 +134,7 @@ class WebCrawler:
 
         for url in start_urls:
             await self.to_visit.put(url)
+            self.queued.add(url)        # track starting URLs
 
         domains = {urlparse(url).netloc for url in start_urls}
 
@@ -142,7 +148,6 @@ class WebCrawler:
             tasks = []
 
             for _ in range(self.workers):
-
                 tasks.append(
                     asyncio.create_task(
                         self.worker(session, domains)
@@ -153,7 +158,6 @@ class WebCrawler:
 
             for task in tasks:
                 task.cancel()
-
 
 # Starting topic pages
 START_URLS = [
@@ -193,5 +197,6 @@ async def main():
 if __name__ == "__main__":
 
     asyncio.run(main())
+
 
     print("\nCrawling finished.")
