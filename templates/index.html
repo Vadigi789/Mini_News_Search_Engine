@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Mini News Search</title>
+<title>Mini News Search Engine</title>
 
 <style>
 
@@ -11,49 +11,73 @@ body{
     margin:0;
 }
 
+/* Header */
+
 .header{
     text-align:center;
-    padding:40px 0 10px 0;
+    padding:40px 0 20px 0;
 }
 
 .header h1{
-    font-size:36px;
     color:#1a73e8;
-    margin-bottom:20px;
+    font-size:36px;
+    margin-bottom:15px;
 }
+
+/* Search bar */
 
 .search-box{
     text-align:center;
 }
 
 .search-box input{
-    width:500px;
+    width:520px;
     padding:12px;
     font-size:16px;
-    border:1px solid #ccc;
     border-radius:25px;
+    border:1px solid #ccc;
     outline:none;
 }
 
 .search-box button{
     padding:10px 20px;
-    margin-left:10px;
     font-size:16px;
     border:none;
     background:#1a73e8;
     color:white;
     border-radius:20px;
     cursor:pointer;
+    margin-left:8px;
 }
 
+.search-box button:hover{
+    background:#1558b0;
+}
+
+/* Notice */
+
+.notice{
+    width:820px;
+    margin:20px auto;
+    padding:12px;
+    background:#fff3cd;
+    border:1px solid #ffeeba;
+    border-radius:6px;
+    color:#856404;
+    text-align:center;
+    font-size:14px;
+}
+
+/* Results */
+
 .results-container{
-    width:800px;
+    width:820px;
     margin:30px auto;
 }
 
 .result{
     background:white;
-    padding:20px;
+    padding:18px;
     border-radius:8px;
     margin-bottom:20px;
     box-shadow:0 1px 4px rgba(0,0,0,0.1);
@@ -85,9 +109,11 @@ body{
     color:#888;
 }
 
+/* Pagination */
+
 .pagination{
     text-align:center;
-    margin:40px 0;
+    margin:30px 0;
 }
 
 .pagination button{
@@ -96,7 +122,7 @@ body{
     border:none;
     background:#1a73e8;
     color:white;
-    border-radius:5px;
+    border-radius:6px;
     cursor:pointer;
 }
 
@@ -112,14 +138,31 @@ body{
 
 <div class="header">
 
-<h1>Mini News Search</h1>
+<h1>Mini News Search Engine</h1>
 
 <div class="search-box">
 <form method="POST">
-<input type="text" name="query" placeholder="Search news..." value="{{ query }}" required>
+
+<input
+type="text"
+name="query"
+placeholder="Search news..."
+value="{{ query }}"
+required>
+
 <button type="submit">Search</button>
+
 </form>
 </div>
+
+</div>
+
+
+<div class="notice">
+
+⚠️ <b>Notice:</b> This search engine indexes only <b>news and news-related content</b>.
+The database stores articles from the <b>most recent 7 days</b> only.
+Content older than one week is automatically removed and cannot be searched.
 
 </div>
 
@@ -127,6 +170,8 @@ body{
 <div class="results-container">
 
 {% if results %}
+
+<h3>{{ results|length }} Results</h3>
 
 {% for result in results %}
 
@@ -156,19 +201,24 @@ Relevance Score: {{ "%.4f"|format(result.score) }}
 <div class="pagination">
 
 {% if page > 1 %}
+
 <form method="POST" style="display:inline;">
 <input type="hidden" name="query" value="{{ query }}">
 <input type="hidden" name="page" value="{{ page-1 }}">
 <button type="submit">Previous</button>
 </form>
+
 {% endif %}
 
+
 {% if has_next %}
+
 <form method="POST" style="display:inline;">
 <input type="hidden" name="query" value="{{ query }}">
 <input type="hidden" name="page" value="{{ page+1 }}">
 <button type="submit">Next</button>
 </form>
+
 {% endif %}
 
 </div>
