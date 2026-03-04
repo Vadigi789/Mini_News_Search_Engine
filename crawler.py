@@ -259,7 +259,14 @@ async def main():
         workers=25
     )
 
-    await crawler.crawl(START_URLS)
+    try:
+        await asyncio.wait_for(
+            crawler.crawl(START_URLS),
+            timeout=600
+        )
+
+    except asyncio.TimeoutError:
+        print("Crawler stopped: time limit reached")
 
 
 if __name__ == "__main__":
@@ -267,3 +274,4 @@ if __name__ == "__main__":
     asyncio.run(main())
 
     print("\nCrawling finished.")
+
