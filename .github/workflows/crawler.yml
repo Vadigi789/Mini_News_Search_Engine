@@ -22,7 +22,6 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      # Debug step to verify the secret exists (won't print the password)
       - name: Check DB_PASSWORD exists
         run: |
           if [ -z "$DB_PASSWORD" ]; then
@@ -35,6 +34,12 @@ jobs:
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
 
       - name: Run crawler
-        run: python crawler.py
+        run: |
+          echo "Starting crawler..."
+          python crawler.py || (
+            echo "Crawler failed. Retrying once..."
+            sleep 10
+            python crawler.py
+          )
         env:
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
