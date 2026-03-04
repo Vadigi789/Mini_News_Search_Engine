@@ -21,4 +21,6 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Run cleanup
+        env:
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
         run: python cleanup_db.py
