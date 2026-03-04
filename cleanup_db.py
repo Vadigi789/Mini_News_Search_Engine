@@ -1,5 +1,6 @@
 from database import get_connection
 
+
 def cleanup():
 
     conn = get_connection()
@@ -7,7 +8,7 @@ def cleanup():
 
     query = """
     DELETE FROM documents
-    WHERE created_at < NOW() - INTERVAL '7 days';
+    WHERE crawl_time < NOW() - INTERVAL '7 days';
     """
 
     cur.execute(query)
