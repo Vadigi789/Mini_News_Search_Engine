@@ -9,7 +9,7 @@ from utils import clean_text
 
 class WebCrawler:
 
-    def __init__(self, max_pages=200, workers=10):
+    def __init__(self, max_pages=200, workers=12):
 
         self.visited = set()
         self.queued = set()
@@ -19,7 +19,7 @@ class WebCrawler:
         self.max_pages = max_pages
         self.workers = workers
 
-        # limit concurrent requests
+        # limit concurrent HTTP requests
         self.sem = asyncio.Semaphore(10)
 
 
@@ -96,7 +96,7 @@ class WebCrawler:
                     continue
 
 
-                soup = BeautifulSoup(html, "html.parser")
+                soup = BeautifulSoup(html, "lxml")
 
                 paragraphs = soup.find_all("p")
 
@@ -116,7 +116,7 @@ class WebCrawler:
                     title = soup.title.string.strip()
 
 
-                # run DB insert in background thread
+                # run DB insert without blocking async worker
                 doc_id = await asyncio.to_thread(
                     insert_document,
                     title,
@@ -133,6 +133,7 @@ class WebCrawler:
                 for link in soup.find_all("a", href=True):
 
                     href = link["href"]
+
                     full_url = urljoin(url, href)
 
                     parsed = urlparse(full_url)
@@ -145,7 +146,7 @@ class WebCrawler:
                         and self.is_valid_url(full_url)
                     ):
 
-                        if self.to_visit.qsize() < 1000:
+                        if self.to_visit.qsize() < 800:
 
                             self.queued.add(full_url)
 
@@ -168,9 +169,7 @@ class WebCrawler:
     async def crawl(self, start_urls):
 
         for url in start_urls:
-
             await self.to_visit.put(url)
-
             self.queued.add(url)
 
         domains = {urlparse(url).netloc for url in start_urls}
@@ -218,7 +217,7 @@ async def main():
 
     crawler = WebCrawler(
         max_pages=200,
-        workers=10
+        workers=12
     )
 
     await crawler.crawl(START_URLS)
