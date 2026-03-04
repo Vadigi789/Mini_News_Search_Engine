@@ -1,5 +1,6 @@
 import asyncio
 import aiohttp
+import time
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
 
@@ -20,8 +21,11 @@ class WebCrawler:
         self.max_pages = max_pages
         self.workers = workers
 
-        # concurrent request limit
         self.sem = asyncio.Semaphore(10)
+
+        # freeze detection
+        self.last_progress = time.time()
+        self.freeze_timeout = 600   # 10 minutes
 
 
     def is_valid_url(self, url):
@@ -60,7 +64,6 @@ class WebCrawler:
 
                     html = await response.text()
 
-                    # skip huge pages
                     if len(html) > 1_000_000:
                         print("Page too large:", url)
                         return None
@@ -80,8 +83,13 @@ class WebCrawler:
 
         while True:
 
+            # freeze detection
+            if time.time() - self.last_progress > self.freeze_timeout:
+                print("Crawler frozen for too long. Stopping workers.")
+                return
+
             if len(self.visited) >= self.max_pages:
-                break
+                return
 
             url = await self.to_visit.get()
 
@@ -97,7 +105,6 @@ class WebCrawler:
 
                 print("\nCrawling:", url)
 
-                # hard timeout for fetch
                 try:
                     html = await asyncio.wait_for(
                         self.fetch(session, url),
@@ -115,7 +122,6 @@ class WebCrawler:
                     continue
 
 
-                # timeout for parsing
                 try:
                     soup = await asyncio.wait_for(
                         asyncio.to_thread(BeautifulSoup, html, "lxml"),
@@ -160,10 +166,12 @@ class WebCrawler:
 
                 print("Inserted:", doc_id)
 
+                # update freeze timer
+                self.last_progress = time.time()
+
                 self.visited.add(url)
 
 
-                # extract limited links
                 link_count = 0
 
                 for link in soup.find_all("a", href=True):
@@ -255,18 +263,11 @@ START_URLS = [
 async def main():
 
     crawler = WebCrawler(
-        max_pages=100,
+        max_pages=200,
         workers=25
     )
 
-    try:
-        await asyncio.wait_for(
-            crawler.crawl(START_URLS),
-            timeout=600
-        )
-
-    except asyncio.TimeoutError:
-        print("Crawler stopped: time limit reached")
+    await crawler.crawl(START_URLS)
 
 
 if __name__ == "__main__":
@@ -274,5 +275,3 @@ if __name__ == "__main__":
     asyncio.run(main())
 
     print("\nCrawling finished.")
-
-
