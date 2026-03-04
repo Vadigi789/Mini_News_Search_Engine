@@ -23,3 +23,5 @@ jobs:
 
       - name: Run crawler
         run: python crawler.py
+        env:
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
