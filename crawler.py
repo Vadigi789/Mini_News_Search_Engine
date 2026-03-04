@@ -243,20 +243,70 @@ class WebCrawler:
 
 START_URLS = [
 
+    # BBC
     "https://www.bbc.com/news/world",
     "https://www.bbc.com/news/politics",
     "https://www.bbc.com/news/technology",
 
+    # CNN
     "https://edition.cnn.com/world",
     "https://edition.cnn.com/politics",
 
+    # Reuters
     "https://www.reuters.com/world/",
     "https://www.reuters.com/politics/",
+    "https://www.reuters.com/technology/",
 
+    # Guardian
     "https://www.theguardian.com/world",
+    "https://www.theguardian.com/politics",
+    "https://www.theguardian.com/environment",
 
+    # Indian major news
     "https://www.thehindu.com/news/national/",
-    "https://www.ndtv.com/world-news"
+    "https://www.thehindu.com/news/international/",
+    "https://www.ndtv.com/world-news",
+    "https://www.ndtv.com/india-news",
+    "https://indianexpress.com/section/india/",
+    "https://indianexpress.com/section/world/",
+    "https://www.hindustantimes.com/india-news/",
+    "https://www.hindustantimes.com/world-news/",
+    "https://www.indiatoday.in/india",
+    "https://www.indiatoday.in/world",
+
+    # Times of India
+    "https://timesofindia.indiatimes.com/india",
+    "https://timesofindia.indiatimes.com/world",
+    "https://timesofindia.indiatimes.com/politics",
+
+    # News18
+    "https://www.news18.com/india/",
+    "https://www.news18.com/world/",
+
+    # Business / economy
+    "https://www.livemint.com/news/india",
+    "https://www.business-standard.com/india-news",
+    "https://economictimes.indiatimes.com/news/politics-nation",
+
+    # Cricket
+    "https://www.cricbuzz.com/cricket-news",
+    "https://www.espncricinfo.com/latest-cricket-news",
+    "https://sports.ndtv.com/cricket",
+
+    # Entertainment
+    "https://www.bollywoodhungama.com/news/",
+    "https://www.pinkvilla.com/entertainment",
+    "https://www.filmibeat.com/bollywood/news/",
+    "https://www.indiatoday.in/movies",
+
+    # International news
+    "https://www.aljazeera.com/news/",
+    "https://www.nytimes.com/section/world",
+    "https://www.washingtonpost.com/world/",
+    
+    # Geography / environment
+    "https://www.nationalgeographic.com/environment",
+    "https://earth.org/news/",
 ]
 
 
@@ -275,4 +325,5 @@ if __name__ == "__main__":
     asyncio.run(main())
 
     print("\nCrawling finished.")
+
 
