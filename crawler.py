@@ -9,7 +9,7 @@ from utils import clean_text
 
 class WebCrawler:
 
-    def __init__(self, max_pages=200, workers=12):
+    def __init__(self, max_pages=200, workers=16):
 
         self.visited = set()
         self.queued = set()
@@ -19,7 +19,7 @@ class WebCrawler:
         self.max_pages = max_pages
         self.workers = workers
 
-        # limit concurrent HTTP requests
+        # limit concurrent requests
         self.sem = asyncio.Semaphore(10)
 
 
@@ -57,7 +57,14 @@ class WebCrawler:
                     if response.status != 200:
                         return None
 
-                    return await response.text()
+                    html = await response.text()
+
+                    # Skip extremely large pages
+                    if len(html) > 1_000_000:
+                        print("Page too large, skipping:", url)
+                        return None
+
+                    return html
 
         except asyncio.TimeoutError:
             print("Timeout:", url)
@@ -84,7 +91,6 @@ class WebCrawler:
 
                 print("\nCrawling:", url)
 
-                # retry fetch once
                 html = None
                 for _ in range(2):
                     html = await self.fetch(session, url)
@@ -98,7 +104,14 @@ class WebCrawler:
 
                 soup = BeautifulSoup(html, "lxml")
 
-                paragraphs = soup.find_all("p")
+                # Try to focus on article content
+                article = soup.find("article")
+
+                if article:
+                    paragraphs = article.find_all("p")
+                else:
+                    paragraphs = soup.find_all("p")
+
 
                 if len(paragraphs) < 3:
                     self.visited.add(url)
@@ -116,7 +129,6 @@ class WebCrawler:
                     title = soup.title.string.strip()
 
 
-                # run DB insert without blocking async worker
                 doc_id = await asyncio.to_thread(
                     insert_document,
                     title,
@@ -129,11 +141,15 @@ class WebCrawler:
                 self.visited.add(url)
 
 
-                # Extract links
+                # Extract links (limit per page)
+                link_count = 0
+
                 for link in soup.find_all("a", href=True):
 
-                    href = link["href"]
+                    if link_count >= 30:
+                        break
 
+                    href = link["href"]
                     full_url = urljoin(url, href)
 
                     parsed = urlparse(full_url)
@@ -149,8 +165,9 @@ class WebCrawler:
                         if self.to_visit.qsize() < 800:
 
                             self.queued.add(full_url)
-
                             await self.to_visit.put(full_url)
+
+                            link_count += 1
 
 
                 print(
@@ -196,23 +213,18 @@ class WebCrawler:
 
 START_URLS = [
 
-    # BBC
     "https://www.bbc.com/news/world",
     "https://www.bbc.com/news/politics",
     "https://www.bbc.com/news/technology",
 
-    # CNN
     "https://edition.cnn.com/world",
     "https://edition.cnn.com/politics",
 
-    # Reuters
     "https://www.reuters.com/world/",
     "https://www.reuters.com/politics/",
 
-    # Guardian
     "https://www.theguardian.com/world",
 
-    # Indian
     "https://www.thehindu.com/news/national/",
     "https://www.ndtv.com/world-news"
 ]
@@ -222,7 +234,7 @@ async def main():
 
     crawler = WebCrawler(
         max_pages=200,
-        workers=12
+        workers=18
     )
 
     await crawler.crawl(START_URLS)
@@ -233,4 +245,3 @@ if __name__ == "__main__":
     asyncio.run(main())
 
     print("\nCrawling finished.")
-
