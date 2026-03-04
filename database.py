@@ -13,7 +13,7 @@ connection_pool = psycopg2.pool.SimpleConnectionPool(
     host="aws-1-ap-southeast-2.pooler.supabase.com",
     database="postgres",
     user="postgres.isurklczfsdjdfeyrvxx",
-    password=os.getenv("DB_PASSWORD"),
+    password = os.environ["DB_PASSWORD"],
     port=6543,
     sslmode="require"
 )
@@ -92,4 +92,5 @@ def get_documents_by_ids(doc_ids):
     finally:
 
         cur.close()
+
         release_connection(conn)
