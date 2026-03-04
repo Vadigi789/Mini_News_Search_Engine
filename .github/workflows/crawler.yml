@@ -9,20 +9,31 @@ jobs:
   crawl:
     runs-on: ubuntu-latest
 
-    env:
-      DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      # Debug step to verify the secret exists (won't print the password)
+      - name: Check DB_PASSWORD exists
+        run: |
+          if [ -z "$DB_PASSWORD" ]; then
+            echo "DB_PASSWORD is empty"
+            exit 1
+          else
+            echo "DB_PASSWORD loaded successfully"
+          fi
+        env:
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+
       - name: Run crawler
         run: python crawler.py
+        env:
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
