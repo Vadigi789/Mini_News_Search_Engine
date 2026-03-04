@@ -1,47 +1,185 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Mini Search Engine</title>
+<title>Mini News Search</title>
+
+<style>
+
+body{
+    font-family: Arial, sans-serif;
+    background:#f5f5f5;
+    margin:0;
+}
+
+.header{
+    text-align:center;
+    padding:40px 0 10px 0;
+}
+
+.header h1{
+    font-size:36px;
+    color:#1a73e8;
+    margin-bottom:20px;
+}
+
+.search-box{
+    text-align:center;
+}
+
+.search-box input{
+    width:500px;
+    padding:12px;
+    font-size:16px;
+    border:1px solid #ccc;
+    border-radius:25px;
+    outline:none;
+}
+
+.search-box button{
+    padding:10px 20px;
+    margin-left:10px;
+    font-size:16px;
+    border:none;
+    background:#1a73e8;
+    color:white;
+    border-radius:20px;
+    cursor:pointer;
+}
+
+.results-container{
+    width:800px;
+    margin:30px auto;
+}
+
+.result{
+    background:white;
+    padding:20px;
+    border-radius:8px;
+    margin-bottom:20px;
+    box-shadow:0 1px 4px rgba(0,0,0,0.1);
+}
+
+.result a{
+    font-size:20px;
+    color:#1a0dab;
+    text-decoration:none;
+}
+
+.result a:hover{
+    text-decoration:underline;
+}
+
+.url{
+    color:green;
+    font-size:14px;
+}
+
+.snippet{
+    margin-top:8px;
+    font-size:15px;
+    color:#444;
+}
+
+.score{
+    font-size:12px;
+    color:#888;
+}
+
+.pagination{
+    text-align:center;
+    margin:40px 0;
+}
+
+.pagination button{
+    padding:10px 18px;
+    margin:5px;
+    border:none;
+    background:#1a73e8;
+    color:white;
+    border-radius:5px;
+    cursor:pointer;
+}
+
+.pagination button:hover{
+    background:#1558b0;
+}
+
+</style>
 </head>
+
+
 <body>
 
-<h1>Mini Search Engine</h1>
+<div class="header">
 
+<h1>Mini News Search</h1>
+
+<div class="search-box">
 <form method="POST">
-    <input type="text" name="query" placeholder="Enter search term" value="{{ query }}" required>
-    <button type="submit">Search</button>
+<input type="text" name="query" placeholder="Search news..." value="{{ query }}" required>
+<button type="submit">Search</button>
 </form>
-
-<hr>
-
-{% if results %}
-<h2>Results:</h2>
-
-{% for result in results %}
-<div style="margin-bottom: 25px;">
-
-    <h3>
-        <a href="{{ result.url }}" target="_blank">
-            {{ result.title }}
-        </a>
-    </h3>
-
-    <p>{{ result.snippet }}</p>
-
-    <small style="color:green;">
-        {{ result.url }}
-    </small><br>
-
-    <small>
-        Relevant Score: {{ "%.4f"|format(result.score) }}
-    </small>
+</div>
 
 </div>
+
+
+<div class="results-container">
+
+{% if results %}
+
+{% for result in results %}
+
+<div class="result">
+
+<a href="{{ result.url }}" target="_blank">
+{{ result.title }}
+</a>
+
+<div class="url">
+{{ result.url }}
+</div>
+
+<div class="snippet">
+{{ result.snippet }}
+</div>
+
+<div class="score">
+Relevance Score: {{ "%.4f"|format(result.score) }}
+</div>
+
+</div>
+
 {% endfor %}
 
-{% elif query %}
-<p>No results found.</p>
+
+<div class="pagination">
+
+{% if page > 1 %}
+<form method="POST" style="display:inline;">
+<input type="hidden" name="query" value="{{ query }}">
+<input type="hidden" name="page" value="{{ page-1 }}">
+<button type="submit">Previous</button>
+</form>
 {% endif %}
+
+{% if has_next %}
+<form method="POST" style="display:inline;">
+<input type="hidden" name="query" value="{{ query }}">
+<input type="hidden" name="page" value="{{ page+1 }}">
+<button type="submit">Next</button>
+</form>
+{% endif %}
+
+</div>
+
+{% elif query %}
+
+<p style="text-align:center;">No results found.</p>
+
+{% endif %}
+
+</div>
 
 </body>
 </html>
