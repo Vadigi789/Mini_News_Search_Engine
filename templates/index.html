@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Mini Search Engine</title>
+</head>
+<body>
+
+<h1>Mini Search Engine</h1>
+
+<form method="POST">
+    <input type="text" name="query" placeholder="Enter search term" value="{{ query }}" required>
+    <button type="submit">Search</button>
+</form>
+
+<hr>
+
+{% if results %}
+<h2>Results:</h2>
+
+{% for result in results %}
+<div style="margin-bottom: 25px;">
+
+    <h3>
+        <a href="{{ result.url }}" target="_blank">
+            {{ result.title }}
+        </a>
+    </h3>
+
+    <p>{{ result.snippet }}</p>
+
+    <small style="color:green;">
+        {{ result.url }}
+    </small><br>
+
+    <small>
+        Relevant Score: {{ "%.4f"|format(result.score) }}
+    </small>
+
+</div>
+{% endfor %}
+
+{% elif query %}
+<p>No results found.</p>
+{% endif %}
+
+</body>
+</html>

@@ -1,0 +1,197 @@
+import asyncio
+import aiohttp
+from bs4 import BeautifulSoup
+from urllib.parse import urljoin, urlparse
+
+from database import insert_document
+from utils import clean_text
+
+
+class WebCrawler:
+
+    def __init__(self, max_pages=200, workers=10):
+
+        self.visited = set()
+        self.to_visit = asyncio.Queue()
+        self.max_pages = max_pages
+        self.workers = workers
+
+
+    def is_valid_url(self, url):
+
+        blacklist = ["#", "login", "signup", "contact", "privacy", "terms"]
+
+        if any(word in url.lower() for word in blacklist):
+            return False
+
+        if url.endswith((".jpg", ".png", ".pdf", ".jpeg", ".svg")):
+            return False
+
+        return True
+
+
+    async def fetch(self, session, url):
+
+        try:
+            async with session.get(url) as response:
+
+                if response.status != 200:
+                    return None
+
+                return await response.text()
+
+        except:
+            print("Fetch error:", url)
+            return None
+
+
+    async def worker(self, session, domains):
+
+        while True:
+
+            if len(self.visited) >= self.max_pages:
+                return
+
+            try:
+                url = await asyncio.wait_for(self.to_visit.get(), timeout=5)
+            except asyncio.TimeoutError:
+                return
+
+            if url in self.visited:
+                self.to_visit.task_done()
+                continue
+
+            print("\nCrawling:", url)
+
+            html = await self.fetch(session, url)
+
+            if not html:
+                self.visited.add(url)
+                self.to_visit.task_done()
+                continue
+
+
+            soup = BeautifulSoup(html, "html.parser")
+
+            paragraphs = soup.find_all("p")
+
+            if len(paragraphs) < 3:
+                self.visited.add(url)
+                self.to_visit.task_done()
+                continue
+
+
+            full_text = "\n".join(p.get_text() for p in paragraphs)
+
+            words = clean_text(full_text)
+
+            content = " ".join(words[:500])
+
+            title = url
+            if soup.title and soup.title.string:
+                title = soup.title.string.strip()
+
+
+            doc_id = insert_document(title, url, content)
+
+            print("Inserted:", doc_id)
+
+            self.visited.add(url)
+
+
+            for link in soup.find_all("a", href=True):
+
+                href = link["href"]
+
+                full_url = urljoin(url, href)
+
+                parsed = urlparse(full_url)
+
+                if (
+                    parsed.scheme in ["http", "https"]
+                    and parsed.netloc in domains
+                    and full_url not in self.visited
+                    and self.is_valid_url(full_url)
+                ):
+
+                    if self.to_visit.qsize() < 10000:
+                        await self.to_visit.put(full_url)
+
+
+            print(
+                f"Visited: {len(self.visited)} | Queue: {self.to_visit.qsize()}"
+            )
+
+            self.to_visit.task_done()
+
+
+    async def crawl(self, start_urls):
+
+        for url in start_urls:
+            await self.to_visit.put(url)
+
+        domains = {urlparse(url).netloc for url in start_urls}
+
+        timeout = aiohttp.ClientTimeout(total=10)
+
+        async with aiohttp.ClientSession(
+            headers={"User-Agent": "Mozilla/5.0"},
+            timeout=timeout
+        ) as session:
+
+            tasks = []
+
+            for _ in range(self.workers):
+
+                tasks.append(
+                    asyncio.create_task(
+                        self.worker(session, domains)
+                    )
+                )
+
+            await self.to_visit.join()
+
+            for task in tasks:
+                task.cancel()
+
+
+# Starting topic pages
+START_URLS = [
+
+    # BBC
+    "https://www.bbc.com/news/world",
+    "https://www.bbc.com/news/politics",
+    "https://www.bbc.com/news/technology",
+
+    # CNN
+    "https://edition.cnn.com/world",
+    "https://edition.cnn.com/politics",
+
+    # Reuters
+    "https://www.reuters.com/world/",
+    "https://www.reuters.com/politics/",
+
+    # Guardian
+    "https://www.theguardian.com/world",
+
+    # Indian
+    "https://www.thehindu.com/news/national/",
+    "https://www.ndtv.com/world-news"
+]
+
+
+async def main():
+
+    crawler = WebCrawler(
+        max_pages=200,
+        workers=10
+    )
+
+    await crawler.crawl(START_URLS)
+
+
+if __name__ == "__main__":
+
+    asyncio.run(main())
+
+    print("\nCrawling finished.")
