@@ -196,18 +196,23 @@ class WebCrawler:
 
 START_URLS = [
 
+    # BBC
     "https://www.bbc.com/news/world",
     "https://www.bbc.com/news/politics",
     "https://www.bbc.com/news/technology",
 
+    # CNN
     "https://edition.cnn.com/world",
     "https://edition.cnn.com/politics",
 
+    # Reuters
     "https://www.reuters.com/world/",
     "https://www.reuters.com/politics/",
 
+    # Guardian
     "https://www.theguardian.com/world",
 
+    # Indian
     "https://www.thehindu.com/news/national/",
     "https://www.ndtv.com/world-news"
 ]
@@ -228,3 +233,4 @@ if __name__ == "__main__":
     asyncio.run(main())
 
     print("\nCrawling finished.")
+
