@@ -273,6 +273,8 @@ START_URLS = [
     "https://www.hindustantimes.com/world-news/",
     "https://www.indiatoday.in/india",
     "https://www.indiatoday.in/world",
+    "https://www.thehindu.com/latest-news/",
+    "https://www.thehindu.com/sci-tech/health/",
 
     # Times of India
     "https://timesofindia.indiatimes.com/india",
@@ -325,5 +327,6 @@ if __name__ == "__main__":
     asyncio.run(main())
 
     print("\nCrawling finished.")
+
 
 
